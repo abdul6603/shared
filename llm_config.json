@@ -1,0 +1,38 @@
+{
+  "local_server": {
+    "base_url": "http://100.90.61.126:11434/v1",
+    "timeout": 60
+  },
+  "models": {
+    "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",
+    "local_small": "mlx-community/Qwen2.5-3B-Instruct-4bit"
+  },
+  "routing": {
+    "reasoning": "local_large",
+    "writing": "local_large",
+    "analysis": "local_large",
+    "fast": "local_small",
+    "coding": "cloud_claude",
+    "image_gen": "cloud_dalle",
+    "voice": "cloud_elevenlabs"
+  },
+  "agent_overrides": {
+    "thor": {
+      "default": "cloud_claude"
+    },
+    "hawk": {
+      "sports_analysis": "cloud_gpt4o"
+    }
+  },
+  "fallback": {
+    "local_large": "cloud_openai",
+    "local_small": "cloud_openai",
+    "cloud_openai": "cloud_claude",
+    "cloud_gpt4o": "cloud_claude"
+  },
+  "cloud": {
+    "openai_model": "gpt-4o-mini",
+    "claude_model": "claude-sonnet-4-20250514",
+    "gpt4o_model": "gpt-4o"
+  }
+}
