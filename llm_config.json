@@ -5,28 +5,33 @@
   },
   "models": {
     "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",
-    "local_small": "mlx-community/Qwen2.5-3B-Instruct-4bit"
+    "local_small": "mlx-community/Qwen2.5-3B-Instruct-4bit",
+    "local_coder": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
   },
   "routing": {
     "reasoning": "local_large",
     "writing": "local_large",
     "analysis": "local_large",
     "fast": "local_small",
-    "coding": "cloud_claude",
+    "coding": "local_coder",
     "image_gen": "cloud_dalle",
     "voice": "cloud_elevenlabs"
   },
   "agent_overrides": {
     "thor": {
-      "default": "cloud_claude"
+      "default": "local_coder"
     },
     "hawk": {
       "sports_analysis": "cloud_gpt4o"
+    },
+    "robotox": {
+      "reasoning": "cloud_claude"
     }
   },
   "fallback": {
     "local_large": "cloud_openai",
     "local_small": "cloud_openai",
+    "local_coder": "cloud_claude",
     "cloud_openai": "cloud_claude",
     "cloud_gpt4o": "cloud_claude"
   },
