@@ -1,7 +1,7 @@
 {
   "local_server": {
-    "base_url": "http://10.0.0.127:11434/v1",
-    "timeout": 60
+    "base_url": "http://localhost:11434/v1",
+    "timeout": 10
   },
   "models": {
     "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",

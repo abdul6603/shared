@@ -56,29 +56,31 @@ def _load_config() -> dict:
 def _default_config() -> dict:
     return {
         "local_server": {
-            "base_url": "http://100.90.61.126:11434/v1",
+            "base_url": "http://localhost:11434/v1",
             "timeout": 60,
         },
         "models": {
             "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",
             "local_small": "mlx-community/Qwen2.5-3B-Instruct-4bit",
+            "local_coder": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
         },
         "routing": {
             "reasoning": "local_large",
             "writing": "local_large",
             "analysis": "local_large",
             "fast": "local_small",
-            "coding": "cloud_claude",
+            "coding": "local_coder",
             "image_gen": "cloud_dalle",
             "voice": "cloud_elevenlabs",
         },
         "agent_overrides": {
-            "thor": {"default": "cloud_claude"},
+            "thor": {"default": "local_coder"},
             "hawk": {"sports_analysis": "cloud_gpt4o"},
         },
         "fallback": {
             "local_large": "cloud_openai",
             "local_small": "cloud_openai",
+            "local_coder": "cloud_claude",
             "cloud_openai": "cloud_claude",
         },
         "cloud": {
@@ -138,7 +140,7 @@ def _is_local_server_up(cfg: dict) -> bool:
     """Quick health check on local LLM server."""
     import urllib.request
     import urllib.error
-    base_url = cfg.get("local_server", {}).get("base_url", "http://100.90.61.126:11434/v1")
+    base_url = cfg.get("local_server", {}).get("base_url", "http://localhost:11434/v1")
     try:
         req = urllib.request.Request(f"{base_url}/models", method="GET")
         with urllib.request.urlopen(req, timeout=3):
@@ -155,7 +157,7 @@ def _call_local(
     import urllib.request
     import urllib.error
 
-    base_url = cfg.get("local_server", {}).get("base_url", "http://100.90.61.126:11434/v1")
+    base_url = cfg.get("local_server", {}).get("base_url", "http://localhost:11434/v1")
     timeout = cfg.get("local_server", {}).get("timeout", 60)
     model_name = cfg.get("models", {}).get(model_key, model_key)
 
