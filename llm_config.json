@@ -1,6 +1,6 @@
 {
   "local_server": {
-    "base_url": "http://100.90.61.126:11434/v1",
+    "base_url": "http://10.0.0.127:11434/v1",
     "timeout": 60
   },
   "models": {
@@ -26,6 +26,9 @@
     },
     "robotox": {
       "reasoning": "cloud_claude"
+    },
+    "razor": {
+      "default": "local_small"
     }
   },
   "fallback": {
@@ -39,5 +42,9 @@
     "openai_model": "gpt-4o-mini",
     "claude_model": "claude-sonnet-4-20250514",
     "gpt4o_model": "gpt-4o"
+  },
+  "embedding": {
+    "model": "bge-small",
+    "dimensions": 384
   }
 }

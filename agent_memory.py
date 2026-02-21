@@ -62,7 +62,8 @@ class AgentMemory:
                 outcome TEXT DEFAULT '',
                 outcome_score REAL DEFAULT 0.0,
                 resolved INTEGER DEFAULT 0,
-                tags TEXT DEFAULT '[]'
+                tags TEXT DEFAULT '[]',
+                embedding BLOB DEFAULT NULL
             );
 
             CREATE TABLE IF NOT EXISTS patterns (
@@ -96,6 +97,12 @@ class AgentMemory:
             CREATE INDEX IF NOT EXISTS idx_knowledge_key ON knowledge(key);
         """)
         conn.commit()
+        # Migration: add embedding column if missing (for existing DBs)
+        try:
+            conn.execute("SELECT embedding FROM decisions LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE decisions ADD COLUMN embedding BLOB DEFAULT NULL")
+            conn.commit()
 
     # ── Decisions ──
 
@@ -110,12 +117,22 @@ class AgentMemory:
         """Log a decision the agent made. Returns decision ID."""
         did = f"dec_{uuid.uuid4().hex[:10]}"
         now = datetime.now(ET).isoformat()
+        # Compute embedding for context (for semantic retrieval later)
+        emb_blob = None
+        try:
+            from shared.embedding_client import embed_text
+            import numpy as np
+            vec = embed_text(context[:500])
+            emb_blob = np.array(vec, dtype=np.float32).tobytes()
+        except Exception:
+            pass
+
         conn = self._get_conn()
         conn.execute(
-            "INSERT INTO decisions (id, timestamp, context, decision, reasoning, confidence, tags) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO decisions (id, timestamp, context, decision, reasoning, confidence, tags, embedding) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (did, now, context[:2000], decision[:2000], reasoning[:2000],
-             max(0.0, min(1.0, confidence)), json.dumps(tags or [])),
+             max(0.0, min(1.0, confidence)), json.dumps(tags or []), emb_blob),
         )
         conn.commit()
         return did
@@ -143,26 +160,93 @@ class AgentMemory:
     def get_relevant_context(self, situation: str, limit: int = 5) -> list[dict]:
         """Find past decisions relevant to the current situation.
 
-        Uses keyword matching on context field. Returns most recent matches.
+        Uses embedding cosine similarity when available, falls back to keyword matching.
         """
-        # Extract keywords (3+ char words)
+        conn = self._get_conn()
+
+        # Try semantic search first
+        try:
+            from shared.embedding_client import embed_text, cosine_similarity
+            import numpy as np
+
+            query_vec = embed_text(situation[:500])
+
+            # Fetch decisions that have embeddings
+            rows = conn.execute(
+                "SELECT * FROM decisions WHERE embedding IS NOT NULL "
+                "ORDER BY timestamp DESC LIMIT 200"
+            ).fetchall()
+
+            if rows:
+                scored = []
+                for r in rows:
+                    emb_bytes = r["embedding"]
+                    if emb_bytes:
+                        stored_vec = np.frombuffer(emb_bytes, dtype=np.float32).tolist()
+                        sim = cosine_similarity(query_vec, stored_vec)
+                        row_dict = dict(r)
+                        row_dict.pop("embedding", None)  # Don't return blob
+                        row_dict["_similarity"] = round(sim, 3)
+                        scored.append(row_dict)
+
+                scored.sort(key=lambda x: -x["_similarity"])
+                # Filter low similarity
+                results = [s for s in scored[:limit] if s["_similarity"] > 0.3]
+                if results:
+                    return results
+                # If no good matches, fall through to keyword search
+        except Exception:
+            pass
+
+        # Fallback: keyword matching
         words = [w.lower() for w in situation.split() if len(w) >= 3]
         if not words:
             return []
 
-        conn = self._get_conn()
-        # Build OR query for keyword matching
         conditions = " OR ".join(["LOWER(context) LIKE ?" for _ in words])
-        params = [f"%{w}%" for w in words[:10]]  # Cap at 10 keywords
+        params = [f"%{w}%" for w in words[:10]]
 
         rows = conn.execute(
-            f"SELECT *, "
-            f"(SELECT COUNT(*) FROM (SELECT 1 WHERE {conditions})) as relevance "
+            f"SELECT id, timestamp, context, decision, reasoning, confidence, "
+            f"outcome, outcome_score, resolved, tags "
             f"FROM decisions WHERE {conditions} "
             f"ORDER BY timestamp DESC LIMIT ?",
-            params + params + [limit],
+            params + [limit],
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def backfill_embeddings(self, batch_size: int = 50) -> int:
+        """Backfill embeddings for decisions that don't have them yet.
+
+        Call once per agent DB to enable semantic search on historical data.
+        Returns number of decisions updated.
+        """
+        try:
+            from shared.embedding_client import embed_batch
+            import numpy as np
+        except ImportError:
+            return 0
+
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT id, context FROM decisions WHERE embedding IS NULL LIMIT ?",
+            (batch_size,),
+        ).fetchall()
+
+        if not rows:
+            return 0
+
+        texts = [r["context"][:500] for r in rows]
+        ids = [r["id"] for r in rows]
+        vecs = embed_batch(texts)
+
+        for did, vec in zip(ids, vecs):
+            blob = np.array(vec, dtype=np.float32).tobytes()
+            conn.execute("UPDATE decisions SET embedding = ? WHERE id = ?", (blob, did))
+
+        conn.commit()
+        log.info("Backfilled embeddings for %d decisions in %s", len(rows), self.agent)
+        return len(rows)
 
     def search_decisions(self, query: str, limit: int = 10) -> list[dict]:
         """Search decisions by context or decision text."""
