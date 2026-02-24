@@ -406,12 +406,18 @@ def llm_call_with_tools(
     route = _resolve_route(cfg, agent, task_type)
     cloud_cfg = cfg.get("cloud", {})
 
-    # For tool calling, prefer local_large or cloud_openai
+    # For tool calling, use agent's configured route (Grok, OpenAI, etc.)
     if force_cloud or not route.startswith("local_") or not _is_local_server_up(cfg):
-        # Use OpenAI for tool calling (most reliable)
-        model = cloud_cfg.get("openai_model", "gpt-4o-mini")
+        # Resolve cloud provider based on agent route
         from openai import OpenAI
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        if route.startswith("cloud_grok"):
+            model = cloud_cfg.get("grok_fast_model", "grok-4-1-fast-non-reasoning") if "fast" in route else cloud_cfg.get("grok_reasoning_model", "grok-3")
+            client = OpenAI(api_key=os.environ.get("XAI_API_KEY", ""), base_url="https://api.x.ai/v1")
+            _provider = "xai"
+        else:
+            model = cloud_cfg.get("openai_model", "gpt-4o-mini")
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+            _provider = "openai"
         t0 = time.time()
         resp = client.chat.completions.create(
             model=model,
@@ -424,7 +430,7 @@ def llm_call_with_tools(
         latency = int((time.time() - t0) * 1000)
         usage = resp.usage
         _log_cost(
-            agent=agent, provider="openai", model=model,
+            agent=agent, provider=_provider, model=model,
             task_type=task_type,
             input_tokens=usage.prompt_tokens if usage else 0,
             output_tokens=usage.completion_tokens if usage else 0,
