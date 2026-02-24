@@ -27,8 +27,12 @@
     "robotox": {
       "reasoning": "cloud_claude"
     },
-    "razor": {
-      "default": "local_small"
+    "shelby": {
+      "default": "cloud_grok_fast",
+      "reasoning": "cloud_grok",
+      "writing": "cloud_grok_fast",
+      "fast": "cloud_grok_fast",
+      "analysis": "cloud_grok"
     }
   },
   "fallback": {
@@ -36,12 +40,16 @@
     "local_small": "cloud_openai",
     "local_coder": "cloud_claude",
     "cloud_openai": "cloud_claude",
-    "cloud_gpt4o": "cloud_claude"
+    "cloud_gpt4o": "cloud_claude",
+    "cloud_grok_fast": "cloud_grok",
+    "cloud_grok": "cloud_claude"
   },
   "cloud": {
     "openai_model": "gpt-4o-mini",
     "claude_model": "claude-sonnet-4-20250514",
-    "gpt4o_model": "gpt-4o"
+    "gpt4o_model": "gpt-4o",
+    "grok_fast_model": "grok-4-1-fast-non-reasoning",
+    "grok_reasoning_model": "grok-3"
   },
   "embedding": {
     "model": "bge-small",

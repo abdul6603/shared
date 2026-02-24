@@ -131,6 +131,8 @@ def _estimate_cost(provider: str, model: str, input_tokens: int, output_tokens: 
         "gpt-4o-mini": (0.15, 0.60),
         "gpt-4o": (2.50, 10.00),
         "claude-sonnet-4-20250514": (3.00, 15.00),
+        "grok-4-1-fast-non-reasoning": (0.20, 0.50),
+        "grok-3": (3.00, 15.00),
     }
     in_rate, out_rate = rates.get(model, (1.0, 3.0))
     return (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
@@ -224,6 +226,31 @@ def _call_claude(
     return text, resp.usage.input_tokens, resp.usage.output_tokens
 
 
+
+
+def _call_grok(
+    model: str, system: str, user: str,
+    max_tokens: int, temperature: float,
+) -> tuple[str, int, int]:
+    """Call xAI Grok API (OpenAI-compatible). Returns (text, in_tokens, out_tokens)."""
+    from openai import OpenAI
+    client = OpenAI(
+        api_key=os.environ.get("XAI_API_KEY", ""),
+        base_url="https://api.x.ai/v1",
+    )
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    text = resp.choices[0].message.content.strip()
+    usage = resp.usage
+    return text, usage.prompt_tokens if usage else 0, usage.completion_tokens if usage else 0
+
 def _resolve_route(cfg: dict, agent: str, task_type: str) -> str:
     """Resolve which model route to use based on config."""
     # Check agent-level overrides first
@@ -308,6 +335,19 @@ def llm_call(
                 )
                 provider = "openai"
 
+            elif target == "cloud_grok_fast":
+                model = cloud_cfg.get("grok_fast_model", "grok-4-1-fast-non-reasoning")
+                text, in_tok, out_tok = _call_grok(
+                    model, system, user, max_tokens, temperature
+                )
+                provider = "xai"
+
+            elif target == "cloud_grok":
+                model = cloud_cfg.get("grok_reasoning_model", "grok-3")
+                text, in_tok, out_tok = _call_grok(
+                    model, system, user, max_tokens, temperature
+                )
+                provider = "xai"
             elif target == "cloud_claude":
                 model = cloud_cfg.get("claude_model", "claude-sonnet-4-20250514")
                 text, in_tok, out_tok = _call_claude(
