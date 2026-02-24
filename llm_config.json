@@ -29,10 +29,10 @@
     },
     "shelby": {
       "default": "cloud_grok_fast",
-      "reasoning": "cloud_grok",
+      "reasoning": "local_large",
       "writing": "cloud_grok_fast",
       "fast": "cloud_grok_fast",
-      "analysis": "cloud_grok"
+      "analysis": "local_large"
     }
   },
   "fallback": {
