@@ -8,6 +8,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import time
 import threading
 from datetime import datetime, timezone, timedelta
@@ -21,9 +22,30 @@ SHARED_DIR = Path(__file__).resolve().parent
 EVENTS_FILE = SHARED_DIR / "events.jsonl"
 CURSORS_FILE = SHARED_DIR / "cursors.json"
 LOCK_FILE = SHARED_DIR / ".events.lock"
+ARCHIVE_DIR = SHARED_DIR / "data"
 
 _lock = threading.Lock()  # intra-process
 _file_lock_fd = None       # cross-process
+
+# --- Event Type Constants ---
+INSIGHT_FOUND = "insight_found"
+AGENT_ERROR = "agent_error"
+TRADE_EXECUTED = "trade_executed"
+BREAKING_NEWS = "breaking_news"
+CYCLE_COMPLETED = "cycle_completed"
+LEARNING_APPLIED = "learning_applied"
+HEALTH_CHECK = "health_check"
+PARAM_SUGGESTION = "param_suggestion"
+
+# Per-agent event type subscriptions
+_subscriptions: dict[str, set[str]] = {}
+
+
+def subscribe(agent_name: str, event_types: list[str]) -> None:
+    """Register an agent to receive only specific event types."""
+    _subscriptions[agent_name] = set(event_types)
+
+
 
 
 def _acquire_file_lock():
@@ -163,6 +185,16 @@ def get_unread(agent_name: str) -> list[dict]:
     return events
 
 
+
+def get_subscribed_events(agent_name: str) -> list[dict]:
+    """Get unread events filtered to agent's subscriptions."""
+    events = get_unread(agent_name)
+    subs = _subscriptions.get(agent_name)
+    if subs:
+        events = [e for e in events if e.get("type") in subs]
+    return events
+
+
 def mark_read(agent_name: str, event_id: str) -> None:
     """Manually set an agent's cursor to a specific event ID."""
     cursors = _load_cursors()
@@ -191,6 +223,52 @@ def get_stats() -> dict:
         "by_type": by_type,
         "by_severity": severities,
     }
+
+
+
+def rotate(max_age_days: int = 7) -> int:
+    """Archive events older than max_age_days. Returns count archived."""
+    if not EVENTS_FILE.exists():
+        return 0
+
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    cutoff = datetime.now(ET) - timedelta(days=max_age_days)
+    events = _read_all()
+    kept = []
+    archived = []
+
+    for e in events:
+        ts_str = e.get("ts", "")
+        try:
+            ts = datetime.fromisoformat(ts_str)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=ET)
+            if ts >= cutoff:
+                kept.append(e)
+            else:
+                archived.append(e)
+        except Exception:
+            kept.append(e)
+
+    if not archived:
+        return 0
+
+    date_str = datetime.now(ET).strftime("%Y%m%d")
+    archive_file = ARCHIVE_DIR / f"events_archive_{date_str}.jsonl"
+    with open(archive_file, "a") as f:
+        for e in archived:
+            f.write(json.dumps(e, default=str) + "\n")
+
+    with _lock:
+        _acquire_file_lock()
+        try:
+            with open(EVENTS_FILE, "w") as f:
+                for e in kept:
+                    f.write(json.dumps(e, default=str) + "\n")
+        finally:
+            _release_file_lock()
+
+    return len(archived)
 
 
 def prune(max_age_hours: int = 48) -> int:
