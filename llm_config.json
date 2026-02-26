@@ -54,7 +54,9 @@
       "_reason": "blocked at 2994%"
     },
     "garves": {
-      "fast": "local_small"
+      "default": "cloud_openai",
+      "fast": "cloud_openai",
+      "analysis": "cloud_openai"
     }
   },
   "fallback": {
