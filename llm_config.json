@@ -1,7 +1,7 @@
 {
   "local_server": {
     "base_url": "http://localhost:11434/v1",
-    "timeout": 10
+    "timeout": 90
   },
   "models": {
     "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",
@@ -9,20 +9,28 @@
     "local_coder": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
   },
   "routing": {
-    "reasoning": "local_large",
-    "writing": "local_large",
-    "analysis": "local_large",
+    "reasoning": "cloud_openai",
+    "writing": "cloud_openai",
+    "analysis": "cloud_openai",
     "fast": "local_small",
-    "coding": "local_coder",
+    "coding": "cloud_openai",
     "image_gen": "cloud_dalle",
     "voice": "cloud_elevenlabs"
   },
   "agent_overrides": {
     "thor": {
-      "default": "local_coder"
+      "default": "local_large",
+      "coding": "cloud_claude",
+      "_governor": true,
+      "_original": {
+        "default": "cloud_openai",
+        "coding": "cloud_claude"
+      },
+      "_reason": "throttled at 90%"
     },
     "hawk": {
-      "sports_analysis": "cloud_gpt4o"
+      "sports_analysis": "cloud_gpt4o",
+      "fast": "local_small"
     },
     "robotox": {
       "reasoning": "cloud_claude"
@@ -36,7 +44,17 @@
     },
     "odin": {
       "analyst": "cloud_claude",
-      "reflection": "local_large"
+      "reflection": "cloud_openai",
+      "default": "local_small",
+      "_governor": true,
+      "_original": {
+        "analyst": "cloud_claude",
+        "reflection": "cloud_openai"
+      },
+      "_reason": "blocked at 2994%"
+    },
+    "garves": {
+      "fast": "local_small"
     }
   },
   "fallback": {
