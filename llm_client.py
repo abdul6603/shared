@@ -1,6 +1,6 @@
 """Shared LLM Client — Unified Router (Local ↔ Cloud).
 
-Routes LLM calls between local MLX server and cloud APIs based on
+Routes LLM calls between local llama.cpp server and cloud APIs based on
 task type, per-agent overrides, and automatic fallback.
 
 Usage:
@@ -57,12 +57,12 @@ def _default_config() -> dict:
     return {
         "local_server": {
             "base_url": "http://localhost:11434/v1",
-            "timeout": 60,
+            "timeout": 30,
         },
         "models": {
-            "local_large": "mlx-community/Qwen2.5-14B-Instruct-4bit",
-            "local_small": "mlx-community/Qwen2.5-3B-Instruct-4bit",
-            "local_coder": "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
+            "local_large": "qwen2.5-14b-instruct",
+            "local_small": "qwen2.5-14b-instruct",
+            "local_coder": "qwen2.5-14b-instruct",
         },
         "routing": {
             "reasoning": "local_large",
@@ -155,12 +155,12 @@ def _call_local(
     cfg: dict, model_key: str, system: str, user: str,
     max_tokens: int, temperature: float,
 ) -> tuple[str, int, int]:
-    """Call local MLX server (OpenAI-compatible). Returns (text, in_tokens, out_tokens)."""
+    """Call local llama.cpp server (OpenAI-compatible). Returns (text, in_tokens, out_tokens)."""
     import urllib.request
     import urllib.error
 
     base_url = cfg.get("local_server", {}).get("base_url", "http://localhost:11434/v1")
-    timeout = cfg.get("local_server", {}).get("timeout", 60)
+    timeout = cfg.get("local_server", {}).get("timeout", 30)
     model_name = cfg.get("models", {}).get(model_key, model_key)
 
     payload = json.dumps({
@@ -194,16 +194,24 @@ def _call_openai(
     """Call OpenAI API. Returns (text, in_tokens, out_tokens)."""
     from openai import OpenAI
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-    resp = client.chat.completions.create(
+    # GPT-5+ uses max_completion_tokens and restricts temperature
+    is_gpt5 = model.startswith("gpt-5") or model.startswith("o")
+    params = dict(
         model=model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        max_tokens=max_tokens,
-        temperature=temperature,
     )
-    text = resp.choices[0].message.content.strip()
+    if is_gpt5:
+        # Reasoning models use ~3-4x tokens for internal reasoning
+        params["max_completion_tokens"] = max(max_tokens * 6, 3000)
+    else:
+        params["max_tokens"] = max_tokens
+        params["temperature"] = temperature
+    resp = client.chat.completions.create(**params)
+    raw = resp.choices[0].message.content
+    text = raw.strip() if raw else ""
     usage = resp.usage
     return text, usage.prompt_tokens if usage else 0, usage.completion_tokens if usage else 0
 
@@ -220,7 +228,7 @@ def _call_claude(
         max_tokens=max_tokens,
         system=system,
         messages=[{"role": "user", "content": user}],
-        temperature=temperature,
+        temperature=temperature if not (model.startswith("gpt-5") and temperature < 1) else max(temperature, 1.0),
     )
     text = resp.content[0].text.strip()
     return text, resp.usage.input_tokens, resp.usage.output_tokens
@@ -245,9 +253,10 @@ def _call_grok(
             {"role": "user", "content": user},
         ],
         max_tokens=max_tokens,
-        temperature=temperature,
+        temperature=temperature if not (model.startswith("gpt-5") and temperature < 1) else max(temperature, 1.0),
     )
-    text = resp.choices[0].message.content.strip()
+    raw = resp.choices[0].message.content
+    text = raw.strip() if raw else ""
     usage = resp.usage
     return text, usage.prompt_tokens if usage else 0, usage.completion_tokens if usage else 0
 
@@ -396,7 +405,7 @@ def llm_call_with_tools(
 ) -> dict:
     """OpenAI-compatible tool-calling LLM call (for Shelby's tool loop).
 
-    Routes to local or cloud. Local MLX servers that support tool calling
+    Routes to local or cloud. Local llama.cpp server supports tool calling
     use the same OpenAI format. Falls back to cloud if local can't do tools.
 
     Returns:
@@ -425,7 +434,7 @@ def llm_call_with_tools(
             tools=tools,
             tool_choice="auto",
             max_tokens=max_tokens,
-            temperature=temperature,
+            temperature=temperature if not (model.startswith("gpt-5") and temperature < 1) else max(temperature, 1.0),
         )
         latency = int((time.time() - t0) * 1000)
         usage = resp.usage
@@ -448,7 +457,7 @@ def llm_call_with_tools(
     import urllib.request
     base_url = cfg["local_server"]["base_url"]
     model_name = cfg["models"].get(route, route)
-    timeout = cfg["local_server"].get("timeout", 60)
+    timeout = cfg["local_server"].get("timeout", 30)
 
     payload = json.dumps({
         "model": model_name,

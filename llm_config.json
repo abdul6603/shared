@@ -19,7 +19,8 @@
   },
   "agent_overrides": {
     "hawk": {
-      "sports_analysis": "cloud_gpt4o"
+      "analysis": "cloud_openai",
+      "default": "cloud_openai"
     },
     "shelby": {
       "default": "cloud_grok_fast",
@@ -29,19 +30,14 @@
       "analysis": "cloud_grok"
     },
     "odin": {
-      "analyst": "cloud_claude",
+      "analyst": "cloud_openai",
       "default": "local_small",
       "_governor": true,
       "_original": {
-        "analyst": "cloud_claude"
+        "analyst": "cloud_openai",
+        "default": "local_large"
       },
-      "_reason": "blocked at 937%"
-    },
-    "thor": {
-      "default": "local_small",
-      "_governor": true,
-      "_original": {},
-      "_reason": "blocked at 102%"
+      "_reason": "throttled at 87%"
     }
   },
   "fallback": {
@@ -54,7 +50,7 @@
     "cloud_grok": "cloud_claude"
   },
   "cloud": {
-    "openai_model": "gpt-4o-mini",
+    "openai_model": "gpt-5-mini",
     "claude_model": "claude-sonnet-4-20250514",
     "gpt4o_model": "gpt-4o",
     "grok_fast_model": "grok-4-1-fast-non-reasoning",
