@@ -10,10 +10,9 @@ New format:
 - Auto-filter
 """
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from pathlib import Path
-from copy import copy
 
 SRC = Path.home() / "Desktop" / "brotherhood_progress.xlsx"
 DEST_PATHS = [

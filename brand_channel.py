@@ -13,10 +13,9 @@ import logging
 import os
 import time
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import Any
 
 log = logging.getLogger(__name__)
 

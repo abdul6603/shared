@@ -1,7 +1,7 @@
 {
   "local_server": {
     "base_url": "http://localhost:11434/v1",
-    "timeout": 30
+    "timeout": 300
   },
   "models": {
     "local_large": "default_model",
@@ -31,13 +31,7 @@
     },
     "odin": {
       "analyst": "cloud_openai",
-      "default": "local_small",
-      "_governor": true,
-      "_original": {
-        "analyst": "cloud_openai",
-        "default": "local_large"
-      },
-      "_reason": "throttled at 87%"
+      "default": "local_large"
     }
   },
   "fallback": {
@@ -59,5 +53,10 @@
   "embedding": {
     "model": "bge-small",
     "dimensions": 384
+  },
+  "routes": {
+    "viper": {
+      "proposal": "local_large"
+    }
   }
 }

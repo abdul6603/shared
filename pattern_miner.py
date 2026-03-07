@@ -74,7 +74,7 @@ def mine_agent(agent: str) -> dict:
         if wr >= MIN_CONFIDENCE or wr <= (1 - MIN_CONFIDENCE):
             result = "wins" if wr >= 0.5 else "loses"
             desc = f"Tag '{tag}': {result} {wr:.0%} of the time ({counts['wins']}W/{counts['losses']}L over {counts['total']} decisions)"
-            pid = mem.add_pattern(
+            mem.add_pattern(
                 pattern_type="tag_performance",
                 description=desc,
                 evidence_count=counts["total"],

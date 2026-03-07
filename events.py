@@ -8,10 +8,9 @@ from __future__ import annotations
 import fcntl
 import json
 import os
-import shutil
 import time
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
