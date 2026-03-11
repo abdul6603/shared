@@ -82,6 +82,12 @@ def _auto_priority(blocking: str) -> str:
     return BLOCKING
 
 
+_PRIORITY_ALIASES = {
+    "p0": URGENT, "p1": BLOCKING, "p2": NICE_TO_HAVE,
+    "high": URGENT, "medium": BLOCKING, "low": NICE_TO_HAVE,
+}
+
+
 def _get_priority(task: dict) -> str:
     try:
         import sys as _sys
@@ -92,7 +98,13 @@ def _get_priority(task: dict) -> str:
             return p
     except Exception:
         pass
-    return task.get("priority", _auto_priority(task.get("blocking", "")))
+    raw = task.get("priority", "")
+    if raw in (URGENT, BLOCKING, NICE_TO_HAVE):
+        return raw
+    mapped = _PRIORITY_ALIASES.get(raw.lower().strip(), "")
+    if mapped:
+        return mapped
+    return _auto_priority(task.get("blocking", ""))
 
 
 def _hours_since(iso_str) -> float:
@@ -154,6 +166,22 @@ _SHORT_DESC = {
     "jt_017": "Add IG @the.soren.era to Buffer",
     "jt_018": "Source 25+ dark instrumentals for audio library",
     "jt_019": "Add link-in-bio URL to TikTok + IG bios",
+    "jt_025": "Apply for BetterHelp affiliate program",
+    "jt_028": "Create new X account for Max",
+    "jt_029": "Subscribe to X Premium on Max account",
+    "jt_030": "Generate X API keys (Free tier) for Max",
+    "jt_031": "Set up Max X profile (headshot, bio, banner)",
+    "jt_032": "Approve first batch of Max content",
+    "jt_033": "[FUTURE] Approve X API Basic ($200/mo)",
+    "jt_034": "Start Shelby V2 Phase 2 & 3 (Friday 3/13)",
+    "jt_035": "Sign up Braintrust \u2192 usebraintrust.com",
+    "jt_036": "Sign up Botpool \u2192 botpool.ai",
+    "jt_037": "Apply to Arc.dev \u2192 vetted network",
+    "jt_038": "Join n8n Community \u2192 Jobs section",
+    "jt_039": "Join Make.com Community \u2192 Hire Help",
+    "jt_040": "Register DarkCode AI on Clutch.co",
+    "jt_041": "Register DarkCode AI on GoodFirms",
+    "jt_042": "Create Google Business Profile \u2192 DarkCode AI",
 }
 
 _SHORT_BLOCKING = {
@@ -170,6 +198,22 @@ _SHORT_BLOCKING = {
     "jt_017": "IG auto-posting",
     "jt_018": "Audio brain",
     "jt_019": "Lead capture from bios",
+    "jt_025": "BetterHelp affiliate revenue",
+    "jt_028": "Max X presence",
+    "jt_029": "Max X Premium features",
+    "jt_030": "Max X auto-posting",
+    "jt_031": "Max X credibility",
+    "jt_032": "Max content going live",
+    "jt_033": "Max auto-reply feature",
+    "jt_034": "Shelby V2 upgrades",
+    "jt_035": "0% commission lead channel",
+    "jt_036": "AI-only marketplace leads",
+    "jt_037": "High-value vetted projects",
+    "jt_038": "n8n automation gigs",
+    "jt_039": "Make.com automation gigs",
+    "jt_040": "Inbound directory leads",
+    "jt_041": "Inbound directory leads",
+    "jt_042": "Google Maps visibility",
 }
 
 
@@ -351,31 +395,27 @@ def format_pending_text() -> str:
 
     if urgent:
         lines.append(f"\U0001f534 <b>URGENT ({len(urgent)}):</b>\n")
-        for t in urgent[:5]:
+        for t in urgent:
             num += 1
             lines.append(f"{num}. {_desc(t)}")
             lines.append(f"   \u23f1 {t.get('time_estimate', '?')} | Blocking: {_block(t)}\n")
 
     if blocking:
         lines.append(f"\U0001f7e1 <b>BLOCKING ({len(blocking)}):</b>\n")
-        for t in blocking[:5]:
+        for t in blocking:
             num += 1
             lines.append(f"{num}. {_desc(t)}")
             lines.append(f"   \u23f1 {t.get('time_estimate', '?')} | Blocking: {_block(t)}\n")
 
     if nice:
         lines.append(f"\U0001f7e2 <b>NICE TO HAVE ({len(nice)}):</b>\n")
-        for t in nice[:3]:
+        for t in nice:
             num += 1
             lines.append(f"{num}. {_desc(t)}")
             lines.append(f"   \u23f1 {t.get('time_estimate', '?')}\n")
 
-    shown = num
-    overflow = len(pending) - shown
     lines.append(_SEP)
     lines.append(f"{len(pending)} tasks | ~{_total_time_str(pending)} total")
-    if overflow > 0:
-        lines.append(f"+{overflow} more \u2014 check /tasks for full list")
     lines.append('Say "done [task]" when complete.')
 
     return "\n".join(lines)
@@ -417,29 +457,23 @@ def _send_daily_digest(tasks: list[dict]) -> None:
 
         lines = [f"\U0001f4cb DAILY TASKS \u2014 {date_str}\n"]
         num = 0
-        shown = 0
 
         if urgent:
             lines.append(f"\U0001f534 URGENT ({len(urgent)}):\n")
-            for t in urgent[:5]:
+            for t in urgent:
                 num += 1
-                shown += 1
                 lines.append(f"{num}. {_desc(t)}")
                 lines.append(f"   \u23f1 {t.get('time_estimate', '?')} | Blocking: {_block(t)}\n")
 
-        if blocking and shown < 10:
+        if blocking:
             lines.append(f"\U0001f7e1 BLOCKING ({len(blocking)}):\n")
-            for t in blocking[:min(5, 10 - shown)]:
+            for t in blocking:
                 num += 1
-                shown += 1
                 lines.append(f"{num}. {_desc(t)}")
                 lines.append(f"   \u23f1 {t.get('time_estimate', '?')} | Blocking: {_block(t)}\n")
 
-        overflow = len(tasks) - shown
         lines.append(_SEP)
         lines.append(f"{len(tasks)} tasks | ~{_total_time_str(tasks)} total")
-        if overflow > 0:
-            lines.append(f"+{overflow} more \u2014 check /tasks for full list")
         lines.append('Say "done [task]" when complete.')
 
         msg = "\n".join(lines)
@@ -456,7 +490,7 @@ def _send_weekly_digest(tasks: list[dict]) -> None:
         from telegram_notify import notify, NotifyType, Urgency
 
         lines = ["\U0001f7e2 WEEKLY NICE-TO-HAVE TASKS:\n"]
-        for i, t in enumerate(tasks[:5], 1):
+        for i, t in enumerate(tasks, 1):
             lines.append(f"{i}. {_desc(t)}")
             lines.append(f"   \u23f1 {t.get('time_estimate', '?')}\n")
 
