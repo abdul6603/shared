@@ -28,6 +28,10 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 log = logging.getLogger(__name__)
 
+
+class LLMError(Exception):
+    """Raised when all LLM fallback routes are exhausted."""
+
 SHARED_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = SHARED_DIR / "llm_config.json"
 COSTS_FILE = SHARED_DIR / "llm_costs.jsonl"
@@ -118,8 +122,8 @@ def _log_cost(
     try:
         with open(COSTS_FILE, "a") as f:
             f.write(json.dumps(entry) + "\n")
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning("[LLM_COST] Failed to log cost entry: %s", str(e)[:100])
 
 
 def _estimate_cost(provider: str, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -390,7 +394,7 @@ def llm_call(
             continue
 
     log.error("All LLM routes exhausted for %s/%s", agent, task_type)
-    return ""
+    raise LLMError(f"All LLM routes exhausted for {agent}/{task_type}")
 
 
 def llm_call_with_tools(

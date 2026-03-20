@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from enum import Enum
@@ -124,8 +125,15 @@ def _send_raw(text: str) -> bool:
         urllib.request.urlopen(req, timeout=10)
         _last_send_time = time.time()
         return True
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            retry_after = e.headers.get("Retry-After", "unknown")
+            log.warning("Telegram rate limited (429), retry after %s seconds", retry_after)
+        else:
+            log.error("Telegram HTTP error %d: %s", e.code, str(e)[:100])
+        return False
     except Exception as e:
-        log.error("Telegram send failed: %s", e)
+        log.error("Telegram send failed: %s", str(e)[:100])
         return False
 
 

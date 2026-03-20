@@ -5,15 +5,20 @@ Append-only JSONL file with cursor-based reading and auto-pruning.
 """
 from __future__ import annotations
 
+import atexit
 import fcntl
 import json
+import logging
 import os
+import signal
 import time
 import threading
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
 
@@ -63,6 +68,20 @@ def _release_file_lock():
         _file_lock_fd = None
 
 
+def _cleanup_file_lock(*args):
+    """Cleanup file lock on signal or exit to prevent stale locks."""
+    _release_file_lock()
+
+
+# Register cleanup handlers to prevent stale file locks
+atexit.register(_cleanup_file_lock)
+for _sig in (signal.SIGTERM, signal.SIGINT):
+    try:
+        signal.signal(_sig, _cleanup_file_lock)
+    except (OSError, ValueError):
+        pass  # Can't set signal handlers in non-main thread
+
+
 def _generate_id() -> str:
     """Generate a unique event ID: evt_{unix_ts}_{hex4}."""
     ts = int(time.time())
@@ -100,8 +119,8 @@ def publish(
     if int(time.time()) % 50 == 0:
         try:
             prune()
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("[EVENTS] Auto-prune failed: %s", str(e)[:100])
 
     return event["id"]
 
